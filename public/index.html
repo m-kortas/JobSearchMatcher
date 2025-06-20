@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Board Tracker</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+    <style>
+        /* Custom CSS and variable definitions */
+        :root {
+            --primary: #4F46E5; /* Indigo 600 */
+            --primary-dark: #4338CA; /* Indigo 700 */
+            --secondary: #10B981; /* Emerald 500 */
+            --accent: #F59E0B; /* Amber 500 */
+            --dark: #1F2937; /* Gray 800 */
+            --light: #F9FAFB; /* Gray 50 */
+            --success: #10B981; /* Emerald 500 */
+            --danger: #EF4444; /* Red 500 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--light);
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(120deg, var(--primary) 0%, var(--secondary) 100%);
+        }
+
+        .job-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border-left: 5px solid transparent; /* Add a subtle border for status */
+        }
+
+        .job-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .job-card.applied {
+            border-left-color: var(--success); /* Green border for applied jobs */
+        }
+
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.35em 0.65em;
+            font-size: 0.75em;
+            font-weight: 600;
+            line-height: 1;
+            color: #fff;
+            white-space: nowrap;
+            vertical-align: baseline;
+            border-radius: 0.375rem;
+        }
+
+        .badge-primary { background-color: var(--primary); }
+        .badge-secondary { background-color: var(--secondary); }
+        .badge-accent { background-color: var(--accent); }
+        .badge-dark { background-color: var(--dark); }
+
+        .skill-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            display: inline-block;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .skill-match {
+            background-color: #DCFCE7; /* Green 100 */
+            color: #166534; /* Green 800 */
+        }
+
+        .skill-gap {
+            background-color: #FEE2E2; /* Red 100 */
+            color: #991B1B; /* Red 800 */
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Message box styles */
+        #message-box {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            border-radius: 8px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            z-index: 10000;
+        }
+
+        #message-box.show {
+            opacity: 1;
+        }
+
+        #message-box.success {
+            background-color: var(--success);
+        }
+
+        #message-box.error {
+            background-color: var(--danger);
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <div id="message-box" class=""></div>
+
+    <nav class="bg-indigo-600 text-white shadow-lg sticky top-0 z-10">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center mb-4 md:mb-0">
+                    <i class="fas fa-briefcase text-2xl"></i>
+                    <h1 class="text-2xl font-bold ml-2">My Jobs Tracker</h1>
+                </div>
+
+                <div class="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4 w-full md:w-auto">
+                    <div class="relative flex items-center w-full md:w-64">
+                        <i class="fas fa-search absolute left-3 text-indigo-300"></i>
+                        <input
+                            type="text"
+                            id="search-input"
+                            placeholder="Search jobs..."
+                            class="pl-10 pr-4 py-2 w-full rounded-lg bg-indigo-700 text-white placeholder-indigo-300 focus:outline-none focus:ring-2 focus:ring-white"
+                        />
+                    </div>
+
+                    <div class="flex items-center space-x-2 w-full md:w-auto">
+                        <select
+                            id="filter-applied"
+                            class="rounded-lg bg-indigo-700 text-white p-2 focus:outline-none focus:ring-2 focus:ring-white w-full md:w-auto cursor-pointer"
+                        >
+                            <option value="all">All Jobs</option>
+                            <option value="applied">Applied</option>
+                            <option value="not-applied">Not Applied</option>
+                        </select>
+
+                        <select
+                            id="sort-by"
+                            class="rounded-lg bg-indigo-700 text-white p-2 focus:outline-none focus:ring-2 focus:ring-white w-full md:w-auto cursor-pointer"
+                        >
+                            <option value="match_score_desc">Match Score (High to Low)</option>
+                            <option value="match_score_asc">Match Score (Low to High)</option>
+                            <option value="company_asc">Company (A-Z)</option>
+                            <option value="company_desc">Company (Z-A)</option>
+                            <option value="title_asc">Title (A-Z)</option>
+                            <option value="title_desc">Title (Z-A)</option>
+                        </select>
+
+                        <button
+                            id="save-button"
+                            class="bg-green-500 hover:bg-green-600 text-white p-2 rounded-lg transition flex items-center justify-center w-full md:w-auto"
+                        >
+                            <i class="fas fa-save mr-1"></i>
+                            Save Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 py-6">
+        <div id="stats-container" class="bg-white rounded-lg shadow p-4 text-sm text-gray-600 mb-4">
+            Loading job statistics...
+        </div>
+
+        <div id="jobs-container" class="space-y-4">
+            <div class="bg-white rounded-lg shadow-md p-8 text-center">
+                <div class="text-gray-500 text-lg">Loading jobs...</div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-800 text-white py-6 mt-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <h2 class="text-lg font-semibold">My Board Tracker</h2>
+                    <p class="text-gray-400 text-sm">Keep track of your job applications</p>
+                </div>
+                <div>
+                    <p class="text-gray-400 text-sm">© <span id="current-year"></span> My Jobs Tracker</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Set current year in footer
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+
+        // Global variables to hold job data
+        let allJobs = [];
+        let filteredJobs = [];
+        // IMPORTANT: Replace with the actual path to your CSV file
+        const CSV_URL = 'job_matches.csv';
+
+        // --- Utility Functions ---
+
+        // Parses skills from string format, handling potential JSON arrays or comma-separated strings
+        function parseSkills(skillsStr) {
+            if (!skillsStr) return [];
+            if (Array.isArray(skillsStr)) return skillsStr; // Already an array
+
+            try {
+                // Attempt to parse as JSON (handles cases like '["Skill 1", "Skill 2"]')
+                const parsed = JSON.parse(skillsStr.replace(/'/g, '"'));
+                if (Array.isArray(parsed)) {
+                    return parsed.map(s => s.trim()).filter(s => s);
+                }
+            } catch (e) {
+                // If JSON parsing fails, fall back to comma-separated
+                console.warn("Failed to parse skills as JSON, falling back to comma-separated:", skillsStr, e);
+            }
+
+            // Fallback to comma-separated string
+            return skillsStr.split(',').map(s => s.trim()).filter(s => s);
+        }
+
+        // Displays a temporary message box
+        function showMessage(message, type = 'success') {
+            const messageBox = document.getElementById('message-box');
+            messageBox.textContent = message;
+            messageBox.className = `show ${type}`; // Add show and type class
+
+            // Hide after 3 seconds
+            setTimeout(() => {
+                messageBox.className = ''; // Remove classes to hide
+            }, 3000);
+        }
+
+        // --- Data Handling Functions ---
+
+        // Loads CSV data from the specified URL
+        function loadJobData() {
+            document.getElementById('loading').style.display = 'flex'; // Show loading spinner
+
+            fetch(CSV_URL)
+                .then(response => {
+                    if (!response.ok) {
+                        // Handle HTTP errors
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(parseCsvData)
+                .catch(error => {
+                    console.error('Error loading CSV data:', error);
+                    showMessage(`Error loading job data: ${error.message}`, 'error');
+                    document.getElementById('loading').style.display = 'none'; // Hide loading spinner on error
+                    document.getElementById('jobs-container').innerHTML = `
+                        <div class="bg-white rounded-lg shadow-md p-8 text-center">
+                            <div class="text-red-500 text-lg">Failed to load job data. Please check the CSV file path and permissions.</div>
+                        </div>
+                    `;
+                });
+        }
+
+        // Parses the fetched CSV text data
+        function parseCsvData(csvText) {
+            Papa.parse(csvText, {
+                header: true, // Treat the first row as headers
+                skipEmptyLines: true, // Skip empty rows
+                complete: function(results) {
+                    // Map the parsed data into a more usable structure
+                    allJobs = results.data.map(job => ({
+                        // Use job_id as a unique identifier. Ensure your CSV has this column.
+                        job_id: job.job_id || Math.random().toString(36).substring(7), // Generate a fallback ID if missing
+                        title: job.title || 'N/A',
+                        company: job.company || 'N/A',
+                        location: job.location || 'N/A',
+                        job_url: job.job_url || '#', // Provide a fallback URL
+                        applied: job.apply ? job.apply.toLowerCase() === 'yes' : false, // Convert 'yes'/'no' to boolean
+                        comments: job.comments || '',
+                        match_score: job.match_score ? parseFloat(job.match_score) : 0, // Parse match_score as number
+                        rating: job.rating || '',
+                        source: job.source || 'Unknown',
+                        seniority: job.seniority || '',
+                        employment_type: job.employment_type || '',
+                        match_reason: job.match_reason || '',
+                        description: job.description || '',
+                        skill_matches: parseSkills(job.skill_matches),
+                        skill_gaps: parseSkills(job.skill_gaps)
+                    }));
+
+                    // Initial filtering and rendering
+                    applyFilters();
+                    updateStats();
+                    document.getElementById('loading').style.display = 'none'; // Hide loading spinner
+                },
+                error: function(error) {
+                    console.error('Error parsing CSV:', error);
+                    showMessage(`Error parsing CSV data: ${error.message}`, 'error');
+                    document.getElementById('loading').style.display = 'none'; // Hide loading spinner on error
+                     document.getElementById('jobs-container').innerHTML = `
+                        <div class="bg-white rounded-lg shadow-md p-8 text-center">
+                            <div class="text-red-500 text-lg">Failed to parse CSV data. Please check the file format.</div>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        // Saves the current state of allJobs back to a CSV file (client-side download)
+        // ... (your existing code before saveData) ...
+
+        // Saves the current state of allJobs back to the CSV file on the server
+        async function saveData() { // Make the function async to use await
+            // Convert the current allJobs array back to the original CSV format
+            const dataToSave = allJobs.map(job => ({
+                job_id: job.job_id,
+                title: job.title,
+                company: job.company,
+                location: job.location,
+                job_url: job.job_url,
+                apply: job.applied ? 'yes' : 'no',
+                comments: job.comments,
+                match_score: job.match_score,
+                rating: job.rating,
+                source: job.source,
+                seniority: job.seniority,
+                employment_type: job.employment_type,
+                match_reason: job.match_reason,
+                description: job.description,
+                skill_matches: JSON.stringify(job.skill_matches), // Keep as JSON strings if your backend expects it or can parse it
+                skill_gaps: JSON.stringify(job.skill_gaps)
+                // Include other columns from your original CSV if any
+            }));
+
+            // Use PapaParse to unparse the data back into CSV format
+            const csvString = Papa.unparse(dataToSave);
+
+            // --- START: MODIFICATION FOR BACKEND SAVE ---
+            try {
+                const response = await fetch('/api/save-jobs', { // Replace with your actual backend endpoint URL
+                    method: 'POST', // Or 'PUT'
+                    headers: {
+                        'Content-Type': 'text/csv', // Let the server know you're sending CSV data
+                        // Or if you send JSON: 'Content-Type': 'application/json',
+                        // and send: body: JSON.stringify(dataToSave)
+                    },
+                    body: csvString // Send the CSV string as the body
+                });
+
+                if (!response.ok) {
+                    // Handle server errors (e.g., response.status is 4xx or 5xx)
+                    const errorData = await response.text(); // Or response.json() if server sends JSON error
+                    throw new Error(`Server error: ${response.status} - ${errorData}`);
+                }
+
+                const result = await response.text(); // Or response.json() if server sends JSON success message
+                showMessage('Job data saved successfully on the server!', 'success');
+                console.log('Server response:', result);
+
+            } catch (error) {
+                console.error('Error saving data to server:', error);
+                showMessage(`Error saving data: ${error.message}`, 'error');
+            }
+        }
+
+
+        function renderJobs() {
+            const jobsContainer = document.getElementById('jobs-container');
+
+            if (filteredJobs.length === 0) {
+                jobsContainer.innerHTML = `
+                    <div class="bg-white rounded-lg shadow-md p-8 text-center">
+                        <div class="text-gray-500 text-lg">No jobs match your criteria</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Generate HTML for each job card
+            jobsContainer.innerHTML = filteredJobs.map(job => `
+                <div class="bg-white rounded-lg shadow-md overflow-hidden job-card ${job.applied ? 'applied' : ''}" data-job-id="${job.job_id}">
+                    <div class="p-4 sm:p-6">
+                        <div class="flex flex-col sm:flex-row justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-start justify-between">
+                                    <div>
+                                        <h2 class="text-xl font-semibold text-gray-800 mb-1">${job.title}</h2>
+                                        <div class="flex flex-wrap items-center text-gray-600 text-sm mb-2">
+                                            <span class="flex items-center mr-4 mb-1">
+                                                <i class="fas fa-building mr-1 text-gray-500"></i>
+                                                ${job.company}
+                                            </span>
+                                            <span class="flex items-center mr-4 mb-1">
+                                                <i class="fas fa-map-marker-alt mr-1 text-gray-500"></i>
+                                                ${job.location}
+                                            </span>
+                                            ${job.match_score > 0 ? `
+                                                <span class="flex items-center mr-4 mb-1">
+                                                    <i class="fas fa-medal mr-1 text-yellow-600"></i>
+                                                    Match: ${job.match_score}%
+                                                </span>
+                                            ` : ''}
+                                            ${job.rating ? `
+                                                <span class="flex items-center mb-1">
+                                                    <i class="fas fa-star mr-1 text-yellow-500"></i>
+                                                    ${job.rating}
+                                                </span>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center space-x-2 ml-4">
+                                        <button
+                                            class="toggle-applied-btn rounded-full h-10 w-10 flex items-center justify-center transition ${
+                                                job.applied
+                                                    ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                            }"
+                                            data-job-id="${job.job_id}"
+                                            title="${job.applied ? 'Mark as Not Applied' : 'Mark as Applied'}"
+                                        >
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        <a
+                                            href="${job.job_url}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="bg-indigo-100 text-indigo-600 hover:bg-indigo-200 rounded-full h-10 w-10 flex items-center justify-center transition"
+                                            title="View Job Listing"
+                                        >
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                        <button
+                                            class="toggle-details-btn bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-full h-10 w-10 flex items-center justify-center transition"
+                                            data-job-id="${job.job_id}"
+                                            title="Toggle Details"
+                                        >
+                                            <i class="fas fa-chevron-down"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="flex flex-wrap gap-2 mb-2 mt-2">
+                                    <div class="text-xs font-medium bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
+                                        ${job.source}
+                                    </div>
+                                    ${job.seniority ? `
+                                        <div class="text-xs font-medium bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                                            ${job.seniority}
+                                        </div>
+                                    ` : ''}
+                                    ${job.employment_type ? `
+                                        <div class="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                            ${job.employment_type}
+                                        </div>
+                                    ` : ''}
+                                </div>
+
+                                <div class="text-sm text-gray-600 mt-1">
+                                    <p class="line-clamp-2">${job.match_reason || ''}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="job-details border-t border-gray-100 p-4 sm:p-6 bg-gray-50" style="display: none;" data-job-id="${job.job_id}">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div>
+                                <h3 class="font-medium text-gray-900 mb-2">Skills Match</h3>
+                                <div class="flex flex-wrap">
+                                    ${job.skill_matches && job.skill_matches.length > 0 ?
+                                        job.skill_matches.map(skill => `
+                                            <span class="skill-badge skill-match">${skill}</span>
+                                        `).join('') :
+                                        '<span class="text-gray-500 text-sm">No skill matches specified</span>'
+                                    }
+                                </div>
+
+                                <h3 class="font-medium text-gray-900 mt-4 mb-2">Skills Gap</h3>
+                                <div class="flex flex-wrap">
+                                    ${job.skill_gaps && job.skill_gaps.length > 0 ?
+                                        job.skill_gaps.map(skill => `
+                                            <span class="skill-badge skill-gap">${skill}</span>
+                                        `).join('') :
+                                        '<span class="text-gray-500 text-sm">No skill gaps specified</span>'
+                                    }
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 class="font-medium text-gray-900 mb-2">Comments</h3>
+                                <textarea
+                                    class="job-comments w-full border border-gray-300 rounded-md p-2 text-sm resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                    rows="4"
+                                    placeholder="Add your comments about this job..."
+                                    data-job-id="${job.job_id}"
+                                >${job.comments || ''}</textarea>
+                            </div>
+                        </div>
+
+                        ${job.description ? `
+                            <div class="mt-4">
+                                <h3 class="font-medium text-gray-900 mb-2">Job Description</h3>
+                                <p class="text-sm text-gray-600 whitespace-pre-line">${job.description}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            // After rendering, re-attach event listeners
+            addEventListeners();
+        }
+
+        // Updates the statistics displayed above the job list
+        function updateStats() {
+            const statsContainer = document.getElementById('stats-container');
+            const appliedCount = allJobs.filter(job => job.applied).length;
+            const notAppliedCount = allJobs.length - appliedCount;
+
+            statsContainer.innerHTML = `
+                Showing ${filteredJobs.length} of ${allJobs.length} jobs |
+                Applied: <span class="font-semibold text-green-700">${appliedCount}</span> |
+                Not Applied: <span class="font-semibold text-red-700">${notAppliedCount}</span>
+            `;
+        }
+
+        // --- Event Handling Functions ---
+
+        // Adds event listeners to dynamically created job card elements
+        function addEventListeners() {
+            // Event delegation for toggling job details
+            document.querySelectorAll('.toggle-details-btn').forEach(button => {
+                button.removeEventListener('click', toggleDetails); // Prevent duplicate listeners
+                button.addEventListener('click', toggleDetails);
+            });
+
+            // Event delegation for toggling applied status
+            document.querySelectorAll('.toggle-applied-btn').forEach(button => {
+                button.removeEventListener('click', toggleAppliedStatus); // Prevent duplicate listeners
+                button.addEventListener('click', toggleAppliedStatus);
+            });
+
+            // Event delegation for updating comments
+             document.querySelectorAll('.job-comments').forEach(textarea => {
+                textarea.removeEventListener('input', updateComments); // Prevent duplicate listeners
+                textarea.addEventListener('input', updateComments);
+            });
+        }
+
+        // Handler for toggling job details section visibility
+        function toggleDetails() {
+            const jobId = this.getAttribute('data-job-id');
+            const detailsSection = document.querySelector(`.job-details[data-job-id="${jobId}"]`);
+            const icon = this.querySelector('i');
+
+            if (detailsSection.style.display === 'none') {
+                detailsSection.style.display = 'block';
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            } else {
+                detailsSection.style.display = 'none';
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        }
+
+        // Handler for toggling the applied status of a job
+        function toggleAppliedStatus() {
+            const jobId = this.getAttribute('data-job-id');
+
+            // Find the job in the allJobs array and update its applied status
+            const jobIndex = allJobs.findIndex(job => job.job_id === jobId);
+            if (jobIndex > -1) {
+                allJobs[jobIndex].applied = !allJobs[jobIndex].applied;
+
+                // Re-apply filters and render to update the UI and stats
+                applyFilters();
+                updateStats();
+                 showMessage(`Job "${allJobs[jobIndex].title}" marked as ${allJobs[jobIndex].applied ? 'Applied' : 'Not Applied'}. Remember to save!`);
+            } else {
+                 console.error("Job not found with ID:", jobId);
+                 showMessage("Error updating job status.", 'error');
+            }
+        }
+
+        // Handler for updating comments for a job
+        function updateComments() {
+            const jobId = this.getAttribute('data-job-id');
+            const comments = this.value;
+
+             // Find the job in the allJobs array and update its comments
+            const jobIndex = allJobs.findIndex(job => job.job_id === jobId);
+            if (jobIndex > -1) {
+                allJobs[jobIndex].comments = comments;
+                 // No need to re-render or re-filter for comment changes, just update the data
+                 // console.log(`Comments updated for job ${jobId}`); // Optional: log update
+            } else {
+                 console.error("Job not found with ID:", jobId);
+            }
+        }
+
+
+        // --- Filtering and Sorting Functions ---
+
+        // Applies the current search, filter, and sort criteria to the jobs
+        function applyFilters() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const filterApplied = document.getElementById('filter-applied').value;
+            const sortBy = document.getElementById('sort-by').value;
+
+            // 1. Apply Filters
+            filteredJobs = allJobs.filter(job => {
+                // Filter by search term across relevant fields
+                const matchesSearch = !searchTerm ||
+                    (job.title && job.title.toLowerCase().includes(searchTerm)) ||
+                    (job.company && job.company.toLowerCase().includes(searchTerm)) ||
+                    (job.location && job.location.toLowerCase().includes(searchTerm)) ||
+                    (job.description && job.description.toLowerCase().includes(searchTerm)) ||
+                    (job.match_reason && job.match_reason.toLowerCase().includes(searchTerm)) ||
+                    (job.skill_matches && job.skill_matches.some(skill => skill.toLowerCase().includes(searchTerm))) ||
+                     (job.skill_gaps && job.skill_gaps.some(skill => skill.toLowerCase().includes(searchTerm))) ||
+                     (job.comments && job.comments.toLowerCase().includes(searchTerm));
+
+
+                // Filter by application status ('all', 'applied', 'not-applied')
+                const matchesApplied = filterApplied === 'all' ||
+                    (filterApplied === 'applied' && job.applied) ||
+                    (filterApplied === 'not-applied' && !job.applied);
+
+                return matchesSearch && matchesApplied;
+            });
+
+            // 2. Apply Sorting
+            const [sortKey, sortDirection] = sortBy.split('_');
+
+            filteredJobs.sort((a, b) => {
+                let aValue = a[sortKey];
+                let bValue = b[sortKey];
+
+                // Handle potential null/undefined values gracefully
+                if (aValue === undefined || aValue === null) aValue = '';
+                if (bValue === undefined || bValue === null) bValue = '';
+
+                // Convert to numbers for numerical sorting (match_score)
+                if (sortKey === 'match_score') {
+                    aValue = parseFloat(aValue) || 0;
+                    bValue = parseFloat(bValue) || 0;
+                    // Handle NaN from parseFloat if input is not a valid number
+                    if (isNaN(aValue)) aValue = 0;
+                    if (isNaN(bValue)) bValue = 0;
+                } else {
+                     // Convert to string for consistent string comparison
+                     aValue = String(aValue).toLowerCase();
+                     bValue = String(bValue).toLowerCase();
+                }
+
+
+                if (sortDirection === 'asc') {
+                    if (aValue < bValue) return -1;
+                    if (aValue > bValue) return 1;
+                    return 0; // values are equal
+                } else { // sortDirection === 'desc'
+                    if (aValue > bValue) return -1;
+                    if (aValue < bValue) return 1;
+                    return 0; // values are equal
+                }
+            });
+
+            // 3. Render the filtered and sorted jobs
+            renderJobs();
+             // Update stats based on allJobs, not filteredJobs
+             updateStats();
+        }
+
+
+        // --- Initialisation ---
+
+        // Add event listeners for input changes that trigger filtering/sorting
+        document.getElementById('search-input').addEventListener('input', applyFilters);
+        document.getElementById('filter-applied').addEventListener('change', applyFilters);
+        document.getElementById('sort-by').addEventListener('change', applyFilters);
+        document.getElementById('save-button').addEventListener('click', saveData);
+
+        // Load job data when the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            loadJobData();
+        });
+
+    </script>
+</body>
+</html>
