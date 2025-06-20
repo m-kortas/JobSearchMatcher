@@ -89,7 +89,7 @@ Start the web server to browse results:
 node server.js
 ```
 
-Then open your browser to view the job matches in a user-friendly interface.
+Then open your browser (http://localhost:3002) to view the job matches in a user-friendly interface.
 
 ## 📁 Project Structure
 
