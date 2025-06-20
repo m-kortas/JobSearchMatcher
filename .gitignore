@@ -1,0 +1,291 @@
+# Job Matcher - .gitignore
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+config.env
+secrets.json
+
+# API Keys & Configuration
+*api_key*
+*secret*
+*token*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.ENV/
+.env/
+pyvenv.cfg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit Test / Coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage
+.grunt
+
+# Bower dependency directory
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons
+build/Release
+
+# Dependency directories
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Job Matcher Specific Files
+# Resume files (keep private)
+*.pdf
+CV.pdf
+resume.pdf
+my_resume.pdf
+
+# Job data outputs
+job_matches.csv
+job_results.csv
+matched_jobs.csv
+public/job_matches.csv
+public/*.csv
+
+# Cache and temporary files
+.cache/
+cache/
+scraped_data/
+temp_jobs/
+
+# Company data
+company_ratings.json
+glassdoor_cache.json
+
+# Development and testing
+test_output/
+debug/
+sample_data/
+test_resumes/
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Documentation builds
+docs/_build/
+docs/build/
+
+# Local development
+local/
+dev/
+development/
+
+# Performance and profiling
+*.prof
+*.performance
+
+# Compiled CSS and JS (if using build tools)
+assets/css/compiled/
+assets/js/compiled/
+public/build/
+
+# Package files
+*.tar.gz
+*.zip
+*.rar
+
+# Chrome extension (if scraping with selenium)
+chromedriver
+geckodriver
+*.crx
+
+# Screenshots and images (except documentation)
+screenshots/
+images/temp/
+*.png
+*.jpg
+*.jpeg
+*.gif
+!docs/images/
+!assets/images/
+
+# Large data files
+*.csv.bak
+large_datasets/
+bulk_data/
