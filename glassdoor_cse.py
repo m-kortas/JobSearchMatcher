@@ -73,8 +73,8 @@ class GlassdoorEnricher:
         Returns:
             float: Company rating or 0 if not found
         """
-        # Add location to make search more specific
-        query = f"{company_name} glassdoor sydney"
+        
+        query = f"{company_name} glassdoor"   # Add location to make search more specific 
         
         url = "https://www.googleapis.com/customsearch/v1"
         params = {
