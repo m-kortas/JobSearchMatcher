@@ -74,6 +74,16 @@ coverage.xml
 # pyenv
 .python-version
 
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+
 # pipenv
 Pipfile.lock
 
