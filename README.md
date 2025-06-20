@@ -4,7 +4,9 @@
 
 An intelligent job search automation tool that fetches job listings from multiple sources, matches them against your resume using AI, and enriches the results with company insights from Glassdoor.
 
-<img width="1330" alt="obraz" src="https://github.com/user-attachments/assets/3f7e5176-8df4-4d6a-b553-dcf6f5fc5afb" />
+<img width="600" alt="obraz" src="https://github.com/user-attachments/assets/3f7e5176-8df4-4d6a-b553-dcf6f5fc5afb" />
+<img width="600" alt="Screenshot 2025-06-20 at 10 30 56" src="https://github.com/user-attachments/assets/0ea8ec87-02a0-4eeb-872e-bd560ee49824" />
+
 
 ## ✨ Features
 
