@@ -36,11 +36,11 @@ def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='Job Matcher Pipeline')
     parser.add_argument('--resume', type=str, required=True, help='Path to your resume PDF')
-    parser.add_argument('--keywords', type=str, default='Frontend developer, UI/UX Developer, Web Designer',
+    parser.add_argument('--keywords', type=str, default='Frontend Developer, Software Engineer, Full Stack Developer',
                         help='Job keywords, comma separated. Multi-word phrases will be searched exactly on supported platforms (like LinkedIn)')
     parser.add_argument('--location', type=str, default='Sydney',
                         help='Job location')
-    parser.add_argument('--limit', type=int, default=50,
+    parser.add_argument('--limit', type=int, default=5,
                         help='Maximum number of jobs to fetch from each source')
     parser.add_argument('--output', type=str, default='public/job_matches.csv',
                         help='Output CSV file name')
@@ -151,7 +151,7 @@ def main():
     all_jobs = [
     job for job in all_jobs
     if (
-        (job.get('rating', 0) == 0 or job.get('rating', 0) >= 3.9)  # Allow if rating is missing (0) or >= 3.9
+        (job.get('rating', 0) == 0 or job.get('rating', 0) >= 3.9))]  # Allow if rating is missing (0) or >= 3.9
        # and "Contract" not in job.get('employment_type', "")        # Exclude if employment type includes "Contract"
       #  and job.get('title', "") != ""                
 
