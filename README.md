@@ -18,6 +18,19 @@ An intelligent job search automation tool that fetches job listings from multipl
 - **Concurrent Processing**: Multi-threaded job processing for faster results
 - **Web Interface**: Node.js frontend for easy job browsing
 
+## Disclaimer
+
+This code is provided as an educational example demonstrating how to combine Python's `requests` library with `BeautifulSoup` for web scraping and data extraction. 
+
+**Important Notice:**
+- This code is for educational and research purposes only
+- Users are solely responsible for compliance with website terms of service and applicable laws
+- The author takes no responsibility for how this code is used or any consequences arising from its use
+- Always respect robots.txt files and website rate limits
+- Consider using official APIs when available instead of scraping
+
+Use at your own risk and discretion.
+
 ## 🚀 Quick Start
 
 ### Prerequisites
