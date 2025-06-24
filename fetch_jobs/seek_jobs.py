@@ -2,7 +2,7 @@
 SEEK Job Fetcher
 
 This module fetches job listings from SEEK by scraping the search results and
-job detail pages to extract relevant information.
+job detail pages to extract relevant information with anti-detection measures.
 """
 
 import requests
@@ -12,13 +12,34 @@ import re
 import datetime
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, quote_plus
+import itertools
 
 class SeekJobFetcher:
-    """Class to fetch job listings from SEEK website."""
+    """Class to fetch job listings from SEEK website with anti-detection measures."""
     
-    def __init__(self):
-        """Initialize the SEEK job fetcher with necessary headers and base URL."""
+    def __init__(self, proxies=None, enable_anti_detection=True):
+        """
+        Initialize the SEEK job fetcher with necessary headers and base URL.
+        
+        Args:
+            proxies (list): List of proxy dictionaries in format:
+                          [{'http': 'http://user:pass@ip:port', 'https': 'https://user:pass@ip:port'}, ...]
+            enable_anti_detection (bool): Enable anti-detection measures
+        """
         self.session = requests.Session()
+        self.proxies = proxies or []
+        self.proxy_cycle = itertools.cycle(self.proxies) if self.proxies else None
+        self.enable_anti_detection = enable_anti_detection
+        self.request_count = 0
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:122.0) Gecko/20100101 Firefox/122.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0'
+        ]
+        
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -28,6 +49,119 @@ class SeekJobFetcher:
             'Sec-Fetch-Site': 'none',
         }
         self.base_url = "https://www.seek.com.au"
+        
+        # Configure session for incognito mode simulation
+        if self.enable_anti_detection:
+            self._configure_anti_detection()
+    
+    def _configure_anti_detection(self):
+        """Configure session with anti-detection measures."""
+        # Disable SSL warnings and configure session
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        # Set session timeout and connection pooling
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=1,
+            pool_maxsize=1,
+            max_retries=3
+        )
+        self.session.mount('http://', adapter)
+        self.session.mount('https://', adapter)
+        
+        # Add common browser headers for incognito simulation
+        self.session.headers.update({
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"macOS"',
+            'Upgrade-Insecure-Requests': '1'
+        })
+
+    def _get_next_proxy(self):
+        """Get the next proxy from the rotation."""
+        if self.proxy_cycle:
+            return next(self.proxy_cycle)
+        return None
+
+    def _rotate_user_agent(self):
+        """Rotate user agent for anti-detection."""
+        if self.enable_anti_detection:
+            user_agent = random.choice(self.user_agents)
+            self.headers['User-Agent'] = user_agent
+
+    def _make_request(self, url, **kwargs):
+        """Make a request with proxy rotation and anti-detection measures."""
+        self.request_count += 1
+        
+        # Rotate user agent every few requests
+        if self.request_count % random.randint(3, 7) == 0:
+            self._rotate_user_agent()
+        
+        # Get proxy for this request
+        proxy = self._get_next_proxy()
+        if proxy:
+            kwargs['proxies'] = proxy
+        
+        # Add anti-detection headers dynamically
+        headers = self.headers.copy()
+        if self.enable_anti_detection:
+            # Randomize some header values
+            headers['Accept-Language'] = random.choice([
+                'en-US,en;q=0.9',
+                'en-AU,en;q=0.9,en-US;q=0.8',
+                'en-GB,en;q=0.9,en-US;q=0.8'
+            ])
+            
+            # Randomize viewport hints
+            headers['Viewport-Width'] = str(random.choice([1920, 1366, 1440, 1536]))
+            
+            # Add random referer occasionally
+            if random.random() < 0.3:
+                headers['Referer'] = random.choice([
+                    'https://www.google.com/',
+                    'https://www.google.com.au/',
+                    'https://www.seek.com.au/'
+                ])
+        
+        # Make request with retry logic
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.session.get(url, headers=headers, **kwargs)
+                
+                # Check for rate limiting or blocking
+                if response.status_code == 429:
+                    wait_time = random.uniform(30, 60)
+                    print(f"Rate limited. Waiting {wait_time:.1f} seconds...")
+                    time.sleep(wait_time)
+                    continue
+                
+                # Check for potential blocking patterns
+                if response.status_code == 403 or 'blocked' in response.text.lower():
+                    print(f"Potential blocking detected on attempt {attempt + 1}")
+                    if attempt < max_retries - 1:
+                        time.sleep(random.uniform(10, 20))
+                        continue
+                
+                return response
+                
+            except requests.exceptions.ProxyError:
+                print(f"Proxy error on attempt {attempt + 1}. Trying next proxy...")
+                proxy = self._get_next_proxy()
+                if proxy:
+                    kwargs['proxies'] = proxy
+                continue
+            except requests.exceptions.RequestException as e:
+                if attempt == max_retries - 1:
+                    raise e
+                time.sleep(random.uniform(2, 5))
+        
+        return response
     
     def fetch_jobs(self, keywords, location, limit=20, max_days_old=3):
         """
@@ -69,8 +203,8 @@ class SeekJobFetcher:
                 # Adding date filter directly to the URL
                 search_url = f"{self.base_url}/{keywords_param}-jobs/in-{location_param}?daterange=3&page={page}"
                 
-                # Make the request
-                response = self.session.get(search_url, headers=self.headers)
+                # Make the request with anti-detection measures
+                response = self._make_request(search_url, timeout=15)
                 response.raise_for_status()
                 
                 # Parse job results
@@ -100,8 +234,9 @@ class SeekJobFetcher:
                                 
                                 all_jobs.append(job)
                                 
-                                # Add slight delay to avoid rate limiting
-                                time.sleep(random.uniform(0.5, 1.5))
+                                # Enhanced delay with randomization for anti-detection
+                                delay = random.uniform(1.0, 3.0) if self.enable_anti_detection else random.uniform(0.5, 1.5)
+                                time.sleep(delay)
                             
                     except Exception as e:
                         print(f"Error processing SEEK job card: {str(e)}")
@@ -110,8 +245,9 @@ class SeekJobFetcher:
                 # Move to the next page
                 page += 1
                 
-                # Add delay between pages to avoid rate limiting
-                time.sleep(random.uniform(1.0, 3.0))
+                # Enhanced delay between pages for anti-detection
+                delay = random.uniform(2.0, 6.0) if self.enable_anti_detection else random.uniform(1.0, 3.0)
+                time.sleep(delay)
                 
             except Exception as e:
                 print(f"Error fetching SEEK jobs: {str(e)}")
@@ -216,10 +352,11 @@ class SeekJobFetcher:
             return {}
             
         try:
-            # Add slight delay before fetching details
-            time.sleep(random.uniform(0.5, 1.0))
+            # Enhanced delay with randomization for anti-detection
+            delay = random.uniform(1.0, 2.5) if self.enable_anti_detection else random.uniform(0.5, 1.0)
+            time.sleep(delay)
             
-            response = self.session.get(job_url, headers=self.headers)
+            response = self._make_request(job_url, timeout=15)
             response.raise_for_status()
             
             soup = BeautifulSoup(response.text, 'html.parser')
