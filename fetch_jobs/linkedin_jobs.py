@@ -1,17 +1,38 @@
 import requests
 import time
-import json # Retained for potential future use, though current parsing is HTML-based
+import json  
 import re
 import random
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode, quote_plus
+import itertools
 
 class LinkedInJobFetcher:
-    """Class to fetch job listings from LinkedIn using XHR API calls."""
+    """Class to fetch job listings from LinkedIn using XHR API calls with anti-detection measures."""
 
-    def __init__(self):
-        """Initialize the LinkedIn job fetcher with necessary headers and base URL."""
+    def __init__(self, proxies=None, enable_anti_detection=True):
+        """
+        Initialize the LinkedIn job fetcher with necessary headers and base URL.
+        
+        Args:
+            proxies (list): List of proxy dictionaries in format:
+                          [{'http': 'http://user:pass@ip:port', 'https': 'https://user:pass@ip:port'}, ...]
+            enable_anti_detection (bool): Enable anti-detection measures
+        """
         self.session = requests.Session()
+        self.proxies = proxies or []
+        self.proxy_cycle = itertools.cycle(self.proxies) if self.proxies else None
+        self.enable_anti_detection = enable_anti_detection
+        self.request_count = 0
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:122.0) Gecko/20100101 Firefox/122.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0'
+        ]
+        
         # General headers, good for fetching individual job pages if needed
         self.general_headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -40,6 +61,10 @@ class LinkedInJobFetcher:
         }
         self.base_url = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
         
+        # Configure session for incognito mode simulation
+        if self.enable_anti_detection:
+            self._configure_anti_detection()
+        
         # Optional: Make an initial request to the jobs page to try and get cookies
         # try:
         #     self.session.get("https://www.linkedin.com/jobs/", headers=self.general_headers, timeout=10)
@@ -47,6 +72,103 @@ class LinkedInJobFetcher:
         # except requests.RequestException as e:
         #     print(f"Warning: Initial request to LinkedIn jobs page failed: {e}")
 
+    def _configure_anti_detection(self):
+        """Configure session with anti-detection measures."""
+        # Disable SSL warnings and configure session
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        # Set session timeout and connection pooling
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=1,
+            pool_maxsize=1,
+            max_retries=3
+        )
+        self.session.mount('http://', adapter)
+        self.session.mount('https://', adapter)
+        
+        # Add common browser headers for incognito simulation
+        self.session.headers.update({
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"macOS"'
+        })
+
+    def _get_next_proxy(self):
+        """Get the next proxy from the rotation."""
+        if self.proxy_cycle:
+            return next(self.proxy_cycle)
+        return None
+
+    def _rotate_user_agent(self):
+        """Rotate user agent for anti-detection."""
+        if self.enable_anti_detection:
+            user_agent = random.choice(self.user_agents)
+            self.general_headers['User-Agent'] = user_agent
+            self.api_headers['User-Agent'] = user_agent
+
+    def _make_request(self, url, headers, **kwargs):
+        """Make a request with proxy rotation and anti-detection measures."""
+        self.request_count += 1
+        
+        # Rotate user agent every few requests
+        if self.request_count % random.randint(3, 7) == 0:
+            self._rotate_user_agent()
+        
+        # Get proxy for this request
+        proxy = self._get_next_proxy()
+        if proxy:
+            kwargs['proxies'] = proxy
+        
+        # Add anti-detection headers dynamically
+        if self.enable_anti_detection:
+            # Randomize some header values
+            headers = headers.copy()
+            headers['Accept-Language'] = random.choice([
+                'en-US,en;q=0.9',
+                'en-US,en;q=0.8,es;q=0.7',
+                'en-GB,en;q=0.9,en-US;q=0.8'
+            ])
+            
+            # Add viewport dimensions variation
+            if 'X-Li-Track' in headers:
+                track_data = json.loads(headers['X-Li-Track'])
+                track_data['displayWidth'] = random.choice([1920, 1366, 1440, 1536])
+                track_data['displayHeight'] = random.choice([1080, 768, 900, 864])
+                headers['X-Li-Track'] = json.dumps(track_data)
+        
+        # Make request with retry logic
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.session.get(url, headers=headers, **kwargs)
+                
+                # Check for rate limiting or blocking
+                if response.status_code == 429:
+                    wait_time = random.uniform(30, 60)
+                    print(f"Rate limited. Waiting {wait_time:.1f} seconds...")
+                    time.sleep(wait_time)
+                    continue
+                
+                return response
+                
+            except requests.exceptions.ProxyError:
+                print(f"Proxy error on attempt {attempt + 1}. Trying next proxy...")
+                proxy = self._get_next_proxy()
+                if proxy:
+                    kwargs['proxies'] = proxy
+                continue
+            except requests.exceptions.RequestException as e:
+                if attempt == max_retries - 1:
+                    raise e
+                time.sleep(random.uniform(2, 5))
+        
+        return response
 
     def fetch_jobs(self, keywords, location, limit=100, days_ago=5):
         """
@@ -95,7 +217,7 @@ class LinkedInJobFetcher:
                 # print(f"    Fetching URL: {url}") # Uncomment for debugging
 
                 try:
-                    response = self.session.get(url, headers=self.api_headers, timeout=15)
+                    response = self._make_request(url, self.api_headers, timeout=15)
                     # print(f"    Status Code: {response.status_code}") # Uncomment for debugging
                     response.raise_for_status() # Raises HTTPError for bad responses (4XX or 5XX)
 
@@ -142,7 +264,10 @@ class LinkedInJobFetcher:
                             newly_added_jobs_this_page += 1
                             jobs_found_for_this_keyword +=1
                             # print(f"      Added job: {job_data['title'][:50]}...") # Uncomment for debugging
-                            time.sleep(random.uniform(0.5, 1.2)) # Small delay after processing each job
+                            
+                            # Enhanced delay with randomization for anti-detection
+                            delay = random.uniform(0.8, 2.5) if self.enable_anti_detection else random.uniform(0.5, 1.2)
+                            time.sleep(delay)
                     
                     print(f"    Added {newly_added_jobs_this_page} new jobs from this page for '{keyword}'.")
 
@@ -153,7 +278,6 @@ class LinkedInJobFetcher:
                     if search_params['start'] == 0 and newly_added_jobs_this_page == 0 and not job_cards: # Should be caught by earlier break
                          print(f"    No jobs found at all for '{keyword}'.")
                          break
-
 
                     # Prepare for the next page
                     search_params['start'] += search_params['count']
@@ -166,7 +290,9 @@ class LinkedInJobFetcher:
                         print(f"    Reached LinkedIn's typical pagination depth (around 1000 results) for '{keyword}'.")
                         break
                     
-                    time.sleep(random.uniform(1.8, 4.0)) # Delay between paginated requests
+                    # Enhanced delay between paginated requests for anti-detection
+                    delay = random.uniform(3.0, 8.0) if self.enable_anti_detection else random.uniform(1.8, 4.0)
+                    time.sleep(delay)
 
                 except requests.exceptions.HTTPError as e:
                     print(f"    HTTP error for '{keyword}' at start={search_params['start']}: {e}")
@@ -184,9 +310,10 @@ class LinkedInJobFetcher:
                     break
             
             print(f"  Finished searching for '{keyword}'. Total jobs added for this keyword: {jobs_found_for_this_keyword}")
-            # Delay between different keywords
+            # Enhanced delay between different keywords for anti-detection
             if keyword != keywords[-1]: # Avoid sleeping after the last keyword
-                 time.sleep(random.uniform(2.0, 4.5))
+                delay = random.uniform(4.0, 9.0) if self.enable_anti_detection else random.uniform(2.0, 4.5)
+                time.sleep(delay)
         
         return all_jobs
 
@@ -250,9 +377,12 @@ class LinkedInJobFetcher:
             return {}
         
         try:
-            time.sleep(random.uniform(0.7, 1.5)) # Be respectful with delays
+            # Enhanced delay with randomization for anti-detection
+            delay = random.uniform(1.2, 3.0) if self.enable_anti_detection else random.uniform(0.7, 1.5)
+            time.sleep(delay)
+            
             # Use general headers for fetching the job detail page
-            response = self.session.get(job_url, headers=self.general_headers, timeout=15)
+            response = self._make_request(job_url, self.general_headers, timeout=15)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
 
