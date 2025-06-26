@@ -182,7 +182,7 @@ def main():
             except Exception as e:
                 print(f"    - Error matching job {job['title']}: {str(e)}")
 
-    all_jobs = [job for job in all_jobs if job.get('match_score', 0) > 70]
+    all_jobs = [job for job in all_jobs if job.get('match_score', 0) > 55]
 
     print('matched jobs:',len(all_jobs))
     
